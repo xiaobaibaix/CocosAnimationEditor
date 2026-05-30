@@ -14,12 +14,19 @@ Thumbs.db
 # Cache
 .cache/
 
-# Compiled objects
+# Compiled objects (only in build output, NOT prebuilt libs)
 *.o
 *.obj
+*.plugin
+
+# Prebuilt libraries in cocos2d external/ must be committed
 *.a
 *.lib
 *.so
 *.dylib
 *.dll
-*.plugin
+!Library/cocos2d/external/*/prebuilt/**/*.a
+!Library/cocos2d/external/*/prebuilt/**/*.lib
+!Library/cocos2d/external/*/prebuilt/**/*.so
+!Library/cocos2d/external/*/prebuilt/**/*.dylib
+!Library/cocos2d/external/*/prebuilt/**/*.dll
