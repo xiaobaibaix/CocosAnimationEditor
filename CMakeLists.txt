@@ -65,14 +65,26 @@ if(APPLE OR WINDOWS)
     cocos_mark_multi_resources(common_res_files RES_TO "Resources" FOLDERS ${GAME_RES_FOLDER})
 endif()
 
-# add cross-platforms source files and header files 
+# add cross-platforms source files and header files
 list(APPEND GAME_SOURCE
      Classes/AppDelegate.cpp
      Classes/HelloWorldScene.cpp
+     Classes/editor/EditorApp.cpp
+     Classes/editor/PluginManager.cpp
      )
 list(APPEND GAME_HEADER
      Classes/AppDelegate.h
      Classes/HelloWorldScene.h
+     Classes/editor/EditorApp.h
+     Classes/editor/PluginManager.h
+     Classes/editor/PluginInterface.h
+     )
+
+# ImGui 后端（GLFW + OpenGL3）— 编译进主项目
+set(IMGUI_BACKEND_DIR ${CMAKE_CURRENT_SOURCE_DIR}/Library/imgui/imgui/backends)
+list(APPEND GAME_SOURCE
+     ${IMGUI_BACKEND_DIR}/imgui_impl_glfw.cpp
+     ${IMGUI_BACKEND_DIR}/imgui_impl_opengl3.cpp
      )
 
 if(ANDROID)
@@ -149,6 +161,8 @@ endif()
 target_include_directories(${APP_NAME}
         PRIVATE Classes
         PRIVATE ${COCOS2DX_ROOT_PATH}/cocos/audio/include/
+        PRIVATE ${IMGUI_BACKEND_DIR}
+        PRIVATE ${COCOS2DX_ROOT_PATH}/external/glfw3/include/linux
 )
 
 # mark app resources
