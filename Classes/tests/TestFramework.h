@@ -22,6 +22,7 @@
 #include <string>
 #include <vector>
 #include <functional>
+#include "imgui.h"
 #include "cocos2d.h"
 
 struct ApiTest {

@@ -70,6 +70,8 @@ list(APPEND GAME_SOURCE
      Classes/AppDelegate.cpp
      Classes/HelloWorldScene.cpp
      Classes/editor/EditorApp.cpp
+     Classes/plugins/property_editor/PropertyEditorPlugin.cpp
+     Classes/plugins/property_editor/test_property_editor_api.cpp
      )
 list(APPEND GAME_HEADER
      Classes/AppDelegate.h
