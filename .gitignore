@@ -25,8 +25,8 @@ Thumbs.db
 *.so
 *.dylib
 *.dll
-!Library/cocos2d/external/*/prebuilt/**/*.a
-!Library/cocos2d/external/*/prebuilt/**/*.lib
-!Library/cocos2d/external/*/prebuilt/**/*.so
-!Library/cocos2d/external/*/prebuilt/**/*.dylib
-!Library/cocos2d/external/*/prebuilt/**/*.dll
+!Library/cocos2d/external/**/prebuilt/**/*.a
+!Library/cocos2d/external/**/prebuilt/**/*.lib
+!Library/cocos2d/external/**/prebuilt/**/*.so
+!Library/cocos2d/external/**/prebuilt/**/*.dylib
+!Library/cocos2d/external/**/prebuilt/**/*.dll
