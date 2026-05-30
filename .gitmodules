@@ -1,0 +1,14 @@
+[submodule "Library/behaviac/behaviac"]
+	path = Library/behaviac/behaviac
+	url = https://github.com/Tencent/behaviac.git
+	branch = master
+
+[submodule "Library/imgui/imgui"]
+	path = Library/imgui/imgui
+	url = https://github.com/ocornut/imgui.git
+	branch = docking
+    
+[submodule "Library/ugf/universal_game_framework"]
+	path = Library/ugf/universal_game_framework
+	url = https://gitee.com/huazi427/universal_game_framework.git
+	branch = master
