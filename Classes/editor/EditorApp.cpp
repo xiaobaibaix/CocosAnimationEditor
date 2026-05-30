@@ -47,15 +47,49 @@ void EditorApp::shutdownImGuiBackends() {
     ImGui::DestroyContext();
 }
 
-class PlaceholderPlugin : public ugf::IPlugin {
+// ============================================================
+//  占位插件 — 演示多组件架构
+//  每个真正的插件 = ugf::IPlugin + ComponentSystem { Model, View, Controller, ... }
+//  组件通过 componentSystem.registerComponent<T>("id", config, args...) 注册
+// ============================================================
+
+// 示例 Model 组件
+class DemoModel : public ugf::Component {
+    std::string id_;
+public:
+    explicit DemoModel(std::string id) : id_(std::move(id)) {}
+    std::string getComponentId() const override { return id_ + ".Model"; }
+    bool initialize(const std::unordered_map<std::string, std::any>&) override { return true; }
+    void update(float) override {}
+    void terminate() override {}
+    const std::string& getId() const { return id_; }
+};
+
+// 示例 View 组件
+class DemoView : public ugf::Component {
     std::string id_; bool show_ = true;
+public:
+    explicit DemoView(std::string id) : id_(std::move(id)) {}
+    std::string getComponentId() const override { return id_ + ".View"; }
+    bool initialize(const std::unordered_map<std::string, std::any>&) override { return true; }
+    void update(float) override {
+        if (show_) { ImGui::Begin(id_.c_str(), &show_); ImGui::Text("View component"); ImGui::End(); }
+    }
+    void terminate() override {}
+};
+
+// 占位插件 — 组合 Model + View 两个组件
+class PlaceholderPlugin : public ugf::IPlugin {
+    std::string id_;
 public:
     explicit PlaceholderPlugin(std::string id) : id_(std::move(id)) {}
     std::string getId() const override { return id_; }
-    bool initialize() override { return true; }
-    void update(float) override {
-        if (show_) { ImGui::Begin(id_.c_str(), &show_); ImGui::Text("UGF Plugin"); ImGui::End(); }
+    bool initialize() override {
+        componentSystem.registerComponent<DemoModel>("model", {}, id_);
+        componentSystem.registerComponent<DemoView>("view", {}, id_);
+        return true;
     }
+    void update(float dt) override { componentSystem.updateAll(dt); }
 };
 
 void EditorApp::registerBuiltinPlugins() {
