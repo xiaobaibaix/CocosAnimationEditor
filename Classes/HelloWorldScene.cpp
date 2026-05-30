@@ -4,7 +4,6 @@
 // 第三方库头文件
 #include "UGF.hpp"
 #include "imgui.h"
-#include "imgui_internal.h"
 #include "behaviac/behaviac.h"
 
 USING_NS_CC;
@@ -132,13 +131,6 @@ void HelloWorld::demoImGui()
     ImVector<int> vec;
     vec.push_back(10); vec.push_back(20); vec.push_back(30);
     CCLOG("[ImGui] ImVector size=%d [1]=%d", vec.Size, vec[1]);
-
-    // ImDrawList (需要 imgui_internal.h)
-    ImDrawListSharedData sharedData;
-    ImDrawList drawList(&sharedData);
-    drawList.AddRectFilled({0, 0}, {100, 100}, IM_COL32(255, 0, 0, 255));
-    CCLOG("[ImGui] DrawList Vtx=%d Idx=%d",
-          drawList.VtxBuffer.Size, drawList.IdxBuffer.Size);
 
     CCLOG("[ImGui] 演示完成");
 }
