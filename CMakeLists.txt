@@ -70,14 +70,12 @@ list(APPEND GAME_SOURCE
      Classes/AppDelegate.cpp
      Classes/HelloWorldScene.cpp
      Classes/editor/EditorApp.cpp
-     Classes/editor/PluginManager.cpp
      )
 list(APPEND GAME_HEADER
      Classes/AppDelegate.h
      Classes/HelloWorldScene.h
      Classes/editor/EditorApp.h
-     Classes/editor/PluginManager.h
-     Classes/editor/PluginInterface.h
+     Classes/editor/EditorEvents.h
      )
 
 # ImGui 后端（GLFW + OpenGL3）— 编译进主项目

@@ -1,155 +1,80 @@
-// EditorApp.cpp - 动画编辑器主场景实现
-// ImGui 渲染后端：GLFW + OpenGL3
+// EditorApp.cpp - 动画编辑器主场景（UGF 框架）
 #include "EditorApp.h"
+#include "EditorEvents.h"
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
-
-// cocos2d desktop GLFW 头文件
 #include "platform/desktop/CCGLViewImpl-desktop.h"
 
 USING_NS_CC;
 
-// ============================================================
-//  Scene factory
-// ============================================================
-
-Scene* EditorApp::createScene() {
-    return EditorApp::create();
-}
-
-// ============================================================
-//  Lifecycle
-// ============================================================
-
-bool EditorApp::init() {
-    if (!Scene::init()) return false;
-    return true;
-}
+Scene* EditorApp::createScene() { return EditorApp::create(); }
+bool EditorApp::init() { return Scene::init(); }
 
 void EditorApp::onEnter() {
     Scene::onEnter();
-
-    // 1. 获取 cocos2d 的 GLFWwindow
-    auto* director = Director::getInstance();
-    auto* glView = dynamic_cast<GLViewImpl*>(director->getOpenGLView());
-    if (!glView) {
-        CCLOG("[EditorApp] ERROR: cannot get GLViewImpl");
-        return;
-    }
+    auto* glView = dynamic_cast<GLViewImpl*>(Director::getInstance()->getOpenGLView());
+    if (!glView) { CCLOG("[EditorApp] no GLViewImpl"); return; }
     glfwWindow_ = glView->getWindow();
-    if (!glfwWindow_) {
-        CCLOG("[EditorApp] ERROR: GLFWwindow is null");
-        return;
-    }
-
-    // 2. 设置 ImGui 后端
     setupImGuiBackends();
-
-    // 3. 注册内置插件
+    if (!imguiBackendsReady_) return;
+    ugf::UGF::getInstance().initialize();
     registerBuiltinPlugins();
-
-    // 4. 初始化所有插件
-    PluginManager::getInstance().initAll();
-
-    // 5. 注册每帧更新
     schedule(schedule_selector(EditorApp::onEditorUpdate), 0.0f);
-
-    CCLOG("[EditorApp] ready, %zu plugins loaded",
-          PluginManager::getInstance().getPluginCount());
+    CCLOG("[EditorApp] %zu plugins loaded", pluginSystem_.size());
 }
 
 void EditorApp::onExit() {
-    PluginManager::getInstance().shutdownAll();
+    pluginSystem_.clear();
     shutdownImGuiBackends();
     Scene::onExit();
 }
 
-// ============================================================
-//  ImGui Backend Setup
-// ============================================================
-
 void EditorApp::setupImGuiBackends() {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO();
-    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-
+    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     ImGui::StyleColorsDark();
-
-    if (!ImGui_ImplGlfw_InitForOpenGL(glfwWindow_, true)) {
-        CCLOG("[EditorApp] ERROR: ImGui_ImplGlfw_InitForOpenGL failed");
-        return;
+    if (!ImGui_ImplGlfw_InitForOpenGL(glfwWindow_, true) ||
+        !ImGui_ImplOpenGL3_Init("#version 130")) {
+        CCLOG("[EditorApp] ImGui backend failed"); return;
     }
-
-    const char* glslVersion = "#version 130";
-    if (!ImGui_ImplOpenGL3_Init(glslVersion)) {
-        CCLOG("[EditorApp] ERROR: ImGui_ImplOpenGL3_Init failed");
-        return;
-    }
-
     imguiBackendsReady_ = true;
-    CCLOG("[EditorApp] ImGui backends ready (GLFW + OpenGL3)");
 }
 
 void EditorApp::shutdownImGuiBackends() {
-    if (imguiBackendsReady_) {
-        ImGui_ImplOpenGL3_Shutdown();
-        ImGui_ImplGlfw_Shutdown();
-        imguiBackendsReady_ = false;
-    }
+    if (imguiBackendsReady_) { ImGui_ImplOpenGL3_Shutdown(); ImGui_ImplGlfw_Shutdown(); }
     ImGui::DestroyContext();
 }
 
-// ============================================================
-//  Plugin Registration
-// ============================================================
-
-class PlaceholderPlugin : public IEditorPlugin {
+class PlaceholderPlugin : public ugf::IPlugin {
+    std::string id_; bool show_ = true;
 public:
-    PlaceholderPlugin(const char* name) : name_(name) {}
-    const char* getName() const override { return name_.c_str(); }
-    bool onInit() override { return true; }
-    void onUpdate(float /*dt*/) override {
-        if (showDemo_) {
-            ImGui::Begin(name_.c_str(), &showDemo_);
-            ImGui::Text("Placeholder - waiting for implementation");
-            ImGui::End();
-        }
+    explicit PlaceholderPlugin(std::string id) : id_(std::move(id)) {}
+    std::string getId() const override { return id_; }
+    bool initialize() override { return true; }
+    void update(float) override {
+        if (show_) { ImGui::Begin(id_.c_str(), &show_); ImGui::Text("UGF Plugin"); ImGui::End(); }
     }
-    void onShutdown() override {}
-private:
-    std::string name_;
-    bool showDemo_ = true;
 };
 
 void EditorApp::registerBuiltinPlugins() {
-    auto& pm = PluginManager::getInstance();
-    pm.registerPlugin(std::make_unique<PlaceholderPlugin>("SceneTree"));
-    pm.registerPlugin(std::make_unique<PlaceholderPlugin>("PropertyEditor"));
-    pm.registerPlugin(std::make_unique<PlaceholderPlugin>("Timeline"));
-    pm.registerPlugin(std::make_unique<PlaceholderPlugin>("BehaviorTree"));
+    pluginSystem_.registerPlugin(std::make_unique<PlaceholderPlugin>("SceneTree"));
+    pluginSystem_.registerPlugin(std::make_unique<PlaceholderPlugin>("PropertyEditor"));
+    pluginSystem_.registerPlugin(std::make_unique<PlaceholderPlugin>("Timeline"));
+    pluginSystem_.registerPlugin(std::make_unique<PlaceholderPlugin>("BehaviorTree"));
 }
 
-// ============================================================
-//  Main Loop
-// ============================================================
-
-void EditorApp::onEditorUpdate(float /*dt*/) {
+void EditorApp::onEditorUpdate(float) {
     if (!imguiBackendsReady_) return;
-
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
-
-    PluginManager::getInstance().updateAll(0.016f);
+    pluginSystem_.updateAll(0.016f);
+    ugf::EventBus::getInstance().update();
 }
 
-void EditorApp::visit(Renderer* renderer, const Mat4& transform, uint32_t parentFlags) {
-    Scene::visit(renderer, transform, parentFlags);
-
-    if (imguiBackendsReady_) {
-        ImGui::Render();
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-    }
+void EditorApp::visit(Renderer* r, const Mat4& t, uint32_t f) {
+    Scene::visit(r, t, f);
+    if (imguiBackendsReady_) { ImGui::Render(); ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData()); }
 }
