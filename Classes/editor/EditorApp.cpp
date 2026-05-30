@@ -1,6 +1,8 @@
 // EditorApp.cpp - 动画编辑器主场景（UGF 框架）
 #include "EditorApp.h"
 #include "EditorEvents.h"
+#include "plugins/scene_tree/SceneTreePlugin.h"
+#include "plugins/behavior_tree/BehaviorTreePlugin.h"
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
@@ -93,10 +95,10 @@ public:
 };
 
 void EditorApp::registerBuiltinPlugins() {
-    pluginSystem_.registerPlugin(std::make_unique<PlaceholderPlugin>("SceneTree"));
+    pluginSystem_.registerPlugin(std::make_unique<SceneTreePlugin>());
     pluginSystem_.registerPlugin(std::make_unique<PlaceholderPlugin>("PropertyEditor"));
     pluginSystem_.registerPlugin(std::make_unique<PlaceholderPlugin>("Timeline"));
-    pluginSystem_.registerPlugin(std::make_unique<PlaceholderPlugin>("BehaviorTree"));
+    pluginSystem_.registerPlugin(std::make_unique<BehaviorTreePlugin>());
 }
 
 void EditorApp::onEditorUpdate(float) {
