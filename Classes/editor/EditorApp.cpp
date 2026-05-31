@@ -3,6 +3,7 @@
 #include "EditorEvents.h"
 #include "plugins/scene_tree/SceneTreePlugin.h"
 #include "plugins/property_editor/PropertyEditorPlugin.h"
+#include "plugins/timeline/TimelinePlugin.h"
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
@@ -91,7 +92,7 @@ public:
 void EditorApp::registerBuiltinPlugins() {
     pluginSystem_.registerPlugin(std::make_unique<SceneTreePlugin>());
     pluginSystem_.registerPlugin(std::make_unique<PropertyEditorPlugin>());
-    pluginSystem_.registerPlugin(std::make_unique<PlaceholderPlugin>("Timeline"));
+    pluginSystem_.registerPlugin(std::make_unique<TimelinePlugin>());
     pluginSystem_.registerPlugin(std::make_unique<PlaceholderPlugin>("BehaviorTree"));
 }
 

@@ -74,6 +74,8 @@ list(APPEND GAME_SOURCE
      Classes/plugins/scene_tree/test_scene_tree_api.cpp
      Classes/plugins/property_editor/PropertyEditorPlugin.cpp
      Classes/plugins/property_editor/test_property_editor_api.cpp
+     Classes/plugins/timeline/TimelinePlugin.cpp
+     Classes/plugins/timeline/test_timeline_api.cpp
      )
 list(APPEND GAME_HEADER
      Classes/AppDelegate.h
@@ -81,6 +83,7 @@ list(APPEND GAME_HEADER
      Classes/editor/EditorApp.h
      Classes/editor/EditorEvents.h
      Classes/plugins/scene_tree/SceneTreePlugin.h
+     Classes/plugins/timeline/TimelinePlugin.h
      )
 
 # ImGui 后端（GLFW + OpenGL3）— 编译进主项目
@@ -163,6 +166,7 @@ if(LINUX)
 endif()
 target_include_directories(${APP_NAME}
         PRIVATE Classes
+        PRIVATE Classes/tests
         PRIVATE ${COCOS2DX_ROOT_PATH}/cocos/audio/include/
         PRIVATE ${IMGUI_BACKEND_DIR}
         PRIVATE ${COCOS2DX_ROOT_PATH}/external/glfw3/include/linux
