@@ -72,6 +72,8 @@ list(APPEND GAME_SOURCE
      Classes/editor/EditorApp.cpp
      Classes/plugins/scene_tree/SceneTreePlugin.cpp
      Classes/plugins/scene_tree/test_scene_tree_api.cpp
+     Classes/plugins/property_editor/PropertyEditorPlugin.cpp
+     Classes/plugins/property_editor/test_property_editor_api.cpp
      )
 list(APPEND GAME_HEADER
      Classes/AppDelegate.h
