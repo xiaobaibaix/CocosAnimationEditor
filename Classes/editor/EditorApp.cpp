@@ -21,7 +21,6 @@ void EditorApp::onEnter() {
     if (!imguiBackendsReady_) return;
     ugf::UGF::getInstance().initialize();
     registerBuiltinPlugins();
-    schedule(schedule_selector(EditorApp::onEditorUpdate), 0.0f);
     CCLOG("[EditorApp] %zu plugins loaded", pluginSystem_.size());
 }
 
@@ -50,11 +49,8 @@ void EditorApp::shutdownImGuiBackends() {
 
 // ============================================================
 //  占位插件 — 演示多组件架构
-//  每个真正的插件 = ugf::IPlugin + ComponentSystem { Model, View, Controller, ... }
-//  组件通过 componentSystem.registerComponent<T>("id", config, args...) 注册
 // ============================================================
 
-// 示例 Model 组件
 class DemoModel : public ugf::Component {
     std::string id_;
 public:
@@ -66,7 +62,6 @@ public:
     const std::string& getId() const { return id_; }
 };
 
-// 示例 View 组件
 class DemoView : public ugf::Component {
     std::string id_; bool show_ = true;
 public:
@@ -79,7 +74,6 @@ public:
     void terminate() override {}
 };
 
-// 占位插件 — 组合 Model + View 两个组件
 class PlaceholderPlugin : public ugf::IPlugin {
     std::string id_;
 public:
@@ -100,16 +94,20 @@ void EditorApp::registerBuiltinPlugins() {
     pluginSystem_.registerPlugin(std::make_unique<PlaceholderPlugin>("BehaviorTree"));
 }
 
-void EditorApp::onEditorUpdate(float) {
+// ImGui NewFrame/Render moved to visit() to ensure correct frame ordering.
+// cocos2d-x calls visit() before onEditorUpdate(), so we need ImGui frame
+// cycle entirely in visit() — otherwise Render() runs before NewFrame().
+void EditorApp::visit(Renderer* r, const Mat4& t, uint32_t f) {
+    Scene::visit(r, t, f);
     if (!imguiBackendsReady_) return;
+
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
+
     pluginSystem_.updateAll(0.016f);
     ugf::EventBus::getInstance().update();
-}
 
-void EditorApp::visit(Renderer* r, const Mat4& t, uint32_t f) {
-    Scene::visit(r, t, f);
-    if (imguiBackendsReady_) { ImGui::Render(); ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData()); }
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }

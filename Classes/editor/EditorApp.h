@@ -15,7 +15,6 @@ public:
     virtual void visit(cocos2d::Renderer*, const cocos2d::Mat4&, uint32_t) override;
     CREATE_FUNC(EditorApp);
 private:
-    void onEditorUpdate(float dt);
     void setupImGuiBackends();
     void shutdownImGuiBackends();
     void registerBuiltinPlugins();
