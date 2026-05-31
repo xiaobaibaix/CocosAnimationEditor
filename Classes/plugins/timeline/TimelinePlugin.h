@@ -9,13 +9,35 @@
 #include "PluginSystem.hpp"
 #include "ComponentSystem.hpp"
 #include "editor/EditorEvents.h"
+#include "imgui.h"
 #include <string>
+#include <vector>
 #include <unordered_map>
 #include <any>
 
 // ================================================================
+//  Keyframe — 单个关键帧
+//  easeType: 0=Linear, 1=EaseIn, 2=EaseOut, 3=EaseInOut
+// ================================================================
+struct Keyframe {
+    int frame = 0;
+    float value = 0.0f;
+    int easeType = 0;
+};
+
+// ================================================================
+//  Track — 单条动画轨道，绑定到节点属性
+// ================================================================
+struct Track {
+    std::string name;
+    std::string targetNode;
+    std::string property;
+    std::vector<Keyframe> keyframes;
+};
+
+// ================================================================
 //  TimelineData — 数据模型组件
-//  存储动画播放状态：帧数、当前帧、播放状态、帧率
+//  存储动画播放状态：帧数、当前帧、播放状态、帧率、轨道列表
 // ================================================================
 class TimelineData : public ugf::Component {
 public:
@@ -33,11 +55,30 @@ public:
     void pause();
     void seekTo(int frame);
     void advance();   // 前进一帧，到达 totalFrames 时循环到 0
+
+    // --- 轨道管理 ---
+    std::vector<Track> tracks_;
+
+    void addTrack(const std::string& name, const std::string& targetNode,
+                  const std::string& property);
+    void removeTrack(int trackIndex);
+    int getTrackCount() const { return static_cast<int>(tracks_.size()); }
+
+    // --- 关键帧管理 ---
+    void addKeyframe(int trackIndex, int frame, float value, int easeType = 0);
+    void removeKeyframe(int trackIndex, int keyframeIndex);
+    void moveKeyframe(int trackIndex, int keyframeIndex, int newFrame, float newValue);
+    void setKeyframeEasing(int trackIndex, int keyframeIndex, int easeType);
+    int getKeyframeCount() const;
+    float interpolate(int trackIndex, int frame) const;
+
+private:
+    int clampFrame(int frame) const;
 };
 
 // ================================================================
 //  TimelineView — ImGui 视图组件
-//  渲染时间轴窗口：时间标尺、播放头、播放/暂停按钮、帧计数器
+//  渲染时间轴窗口：时间标尺、播放头、轨道列表、关键帧钻石标记
 //  通过 config["data"] 获取 TimelineData 指针
 // ================================================================
 class TimelineView : public ugf::Component {
@@ -50,8 +91,47 @@ public:
 private:
     void renderTimelineWindow();
 
+    // 子区域渲染
+    void renderPlaybackControls();
+    void renderTimeRuler();
+    void renderTrackList();
+    void renderCurvePreview(ImDrawList* dl, ImVec2 pos, ImVec2 size, int trackIndex);
+
+    // 坐标转换
+    float frameToX(float frame, float originX) const;
+    float xToFrame(float x, float originX) const;
+
+    // 关键帧命中测试
+    bool hitTestKeyframe(float mouseX, float mouseY, float kfX, float lineY) const;
+
     TimelineData* data_ = nullptr;
     bool windowOpen_ = true;
+
+    // 缩放与滚动
+    float pixelsPerFrame_ = 10.0f;
+    float scrollX_ = 0.0f;
+
+    // 选中状态
+    int selectedTrack_ = -1;
+    int selectedKeyframe_ = -1;
+
+    // 右键菜单触发标志
+    bool pendingKeyframeContextMenu_ = false;
+    bool pendingTrackContextMenu_ = false;
+
+    // 关键帧拖拽状态
+    bool draggingKeyframe_ = false;
+    int dragTrack_ = -1;
+    int dragKeyframeIndex_ = -1;
+    int dragStartFrame_ = 0;
+    float dragStartValue_ = 0.0f;
+
+    // 常量
+    static constexpr float kHeaderWidth = 180.0f;
+    static constexpr float kTrackHeight = 36.0f;
+    static constexpr float kRulerHeight = 32.0f;
+    static constexpr float kKeyframeHalfSize = 5.0f;
+    static constexpr float kKeyframeHitRadius = 8.0f;
 };
 
 // ================================================================

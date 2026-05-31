@@ -71,6 +71,7 @@ list(APPEND GAME_SOURCE
      Classes/HelloWorldScene.cpp
      Classes/editor/EditorApp.cpp
      Classes/plugins/timeline/TimelinePlugin.cpp
+     Classes/plugins/timeline/test_timeline_api.cpp
      )
 list(APPEND GAME_HEADER
      Classes/AppDelegate.h
