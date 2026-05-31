@@ -30,3 +30,4 @@ Thumbs.db
 !Library/cocos2d/external/**/prebuilt/**/*.so
 !Library/cocos2d/external/**/prebuilt/**/*.dylib
 !Library/cocos2d/external/**/prebuilt/**/*.dll
+imgui.ini

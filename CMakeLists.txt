@@ -78,6 +78,8 @@ list(APPEND GAME_SOURCE
      Classes/plugins/timeline/test_timeline_api.cpp
      Classes/plugins/behavior_tree/BehaviorTreePlugin.cpp
      Classes/plugins/behavior_tree/test_behavior_tree_api.cpp
+     Classes/plugins/scene_view/SceneViewPlugin.cpp
+     Classes/plugins/file_system/FileSystemPlugin.cpp
      )
 list(APPEND GAME_HEADER
      Classes/AppDelegate.h
@@ -85,8 +87,11 @@ list(APPEND GAME_HEADER
      Classes/editor/EditorApp.h
      Classes/editor/EditorEvents.h
      Classes/plugins/scene_tree/SceneTreePlugin.h
+     Classes/plugins/property_editor/PropertyEditorPlugin.h
      Classes/plugins/timeline/TimelinePlugin.h
      Classes/plugins/behavior_tree/BehaviorTreePlugin.h
+     Classes/plugins/scene_view/SceneViewPlugin.h
+     Classes/plugins/file_system/FileSystemPlugin.h
      )
 
 # ImGui 后端（GLFW + OpenGL3）— 编译进主项目

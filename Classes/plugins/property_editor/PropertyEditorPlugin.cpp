@@ -325,7 +325,7 @@ void PropertyEditorView::update(float) {
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Y, false))
         applyRedo();
 
-    ImGui::Begin("Property Editor", &showWindow_, ImGuiWindowFlags_NoDocking);
+    ImGui::Begin("Property Editor", &showWindow_);
 
     renderToolbar();
     ImGui::Separator();

@@ -18,8 +18,11 @@ private:
     void setupImGuiBackends();
     void shutdownImGuiBackends();
     void registerBuiltinPlugins();
+    void setupDockspace();
+    void setupInitialDockLayout(unsigned int dockspaceId);
     GLFWwindow* glfwWindow_ = nullptr;
     bool imguiBackendsReady_ = false;
+    bool dockspaceSetup_ = false;
     ugf::PluginSystem pluginSystem_;
 };
 

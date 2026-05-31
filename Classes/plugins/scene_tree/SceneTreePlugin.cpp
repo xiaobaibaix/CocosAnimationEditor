@@ -374,6 +374,7 @@ void SceneTreeView::renderNode(TreeNode* node) {
                     pos = InsertPosition::AfterSibling;
                 }
                 model_->moveNode(draggedName, node->name, pos);
+                ugf::EventBus::getInstance().publish(SceneDataChangedEvent{});
             }
             draggedNodeName_.clear();
             dropTargetNodeName_.clear();
@@ -407,6 +408,7 @@ void SceneTreeView::renderContextMenu(TreeNode* node) {
     }
     if (ImGui::MenuItem("Duplicate")) {
         model_->duplicateNode(node->name);
+        ugf::EventBus::getInstance().publish(SceneDataChangedEvent{});
     }
 
     ImGui::Separator();
@@ -444,7 +446,11 @@ void SceneTreeView::startRename(TreeNode* node) {
 void SceneTreeView::finishRename() {
     if (!renaming_) return;
     if (std::strlen(renameBuffer_) > 0 && renameTarget_ != renameBuffer_) {
+        std::string oldName = renameTarget_;
         model_->renameNode(renameTarget_, renameBuffer_);
+        ugf::EventBus::getInstance().publish(
+            NodeRenamedEvent{oldName, std::string(renameBuffer_)});
+        ugf::EventBus::getInstance().publish(SceneDataChangedEvent{});
     }
     renaming_ = false;
     renameTarget_.clear();
@@ -462,7 +468,10 @@ void SceneTreeView::renderPendingPopups() {
         ImGui::Text("Delete '%s' and all its children?",
                     pendingDeleteTarget_.c_str());
         if (ImGui::Button("Yes", ImVec2(80, 0))) {
+            std::string removedName = pendingDeleteTarget_;
             model_->removeNode(pendingDeleteTarget_);
+            ugf::EventBus::getInstance().publish(NodeRemovedEvent{removedName});
+            ugf::EventBus::getInstance().publish(SceneDataChangedEvent{});
             pendingDeleteTarget_.clear();
             ImGui::CloseCurrentPopup();
         }
@@ -495,6 +504,9 @@ void SceneTreeView::renderPendingPopups() {
                 TreeNode* parent =
                     model_->findNode(pendingAddChildParent_);
                 model_->addNode(addChildBuffer_, parent);
+                ugf::EventBus::getInstance().publish(
+                    NodeAddedEvent{std::string(addChildBuffer_), pendingAddChildParent_});
+                ugf::EventBus::getInstance().publish(SceneDataChangedEvent{});
             }
             pendingAddChildParent_.clear();
             ImGui::CloseCurrentPopup();
