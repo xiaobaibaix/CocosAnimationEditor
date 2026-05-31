@@ -23,12 +23,27 @@ struct TreeNode {
 };
 
 // ============================================================
+//  InsertPosition - controls where a moved node is inserted
+// ============================================================
+enum class InsertPosition {
+    AsChild,        // Default: reparent as child of target
+    BeforeSibling,  // Shift-drag: insert before target sibling
+    AfterSibling    // Ctrl-drag: insert after target sibling
+};
+
+// ============================================================
 //  SceneTreeModel : ugf::Component — 数据层
 // ============================================================
 class SceneTreeModel : public ugf::Component {
 public:
     SceneTreeModel();
     ~SceneTreeModel() override;
+
+    // Rule of Five — prevent accidental copies (class owns raw TreeNode*)
+    SceneTreeModel(const SceneTreeModel&) = delete;
+    SceneTreeModel& operator=(const SceneTreeModel&) = delete;
+    SceneTreeModel(SceneTreeModel&&) = delete;
+    SceneTreeModel& operator=(SceneTreeModel&&) = delete;
 
     // ugf::Component 生命周期
     std::string getComponentId() const override;
@@ -44,6 +59,9 @@ public:
     void selectNode(const std::string& name);
     TreeNode* findNode(const std::string& name) const;
     int getNodeCount() const { return nodeCount_; }
+    bool renameNode(const std::string& oldName, const std::string& newName);
+    bool duplicateNode(const std::string& name);
+    bool moveNode(const std::string& name, const std::string& targetName, InsertPosition pos);
 
 private:
     TreeNode* root_ = nullptr;
@@ -52,7 +70,10 @@ private:
 
     TreeNode* findNodeRecursive(TreeNode* node, const std::string& name) const;
     bool removeNodeRecursive(TreeNode* parent, const std::string& name);
+    int countSubtreeNodes(const TreeNode* node) const;
     void clearSelection(TreeNode* node);
+    bool isDescendantOf(TreeNode* node, TreeNode* potentialAncestor) const;
+    void deepCopyChildren(TreeNode* dest, TreeNode* src);
 };
 
 // ============================================================
@@ -92,10 +113,28 @@ public:
 
 private:
     void renderNode(TreeNode* node);
+    void renderContextMenu(TreeNode* node);
+    void renderRenameInput(TreeNode* node);
+    void startRename(TreeNode* node);
+    void finishRename();
+    void renderPendingPopups();
 
     SceneTreeModel* model_ = nullptr;
     SceneTreeController* controller_ = nullptr;
     bool windowOpen_ = true;
+
+    // Context menu state
+    bool renaming_ = false;
+    std::string renameTarget_;
+    char renameBuffer_[256] = {};
+
+    std::string pendingDeleteTarget_;
+    std::string pendingAddChildParent_;
+    char addChildBuffer_[256] = {};
+
+    // Drag-drop state
+    std::string draggedNodeName_;
+    std::string dropTargetNodeName_;
 };
 
 // ============================================================

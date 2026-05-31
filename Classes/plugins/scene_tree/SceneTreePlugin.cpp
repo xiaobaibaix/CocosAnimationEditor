@@ -1,10 +1,13 @@
 // SceneTreePlugin.cpp - 场景层级树插件实现（多组件架构）
+// 支持右键菜单、节点重命名、复制、拖拽排序/重设父节点
 #include "plugins/scene_tree/SceneTreePlugin.h"
 #include "editor/EditorEvents.h"
 #include "EventSystem.hpp"
 #include "imgui.h"
 #include "tests/TestFramework.h"
 #include "cocos2d.h"
+#include <algorithm>
+#include <cstring>
 
 // ============================================================
 //  TreeNode
@@ -65,14 +68,23 @@ bool SceneTreeModel::removeNode(const std::string& name) {
     return removeNodeRecursive(root_, name);
 }
 
+int SceneTreeModel::countSubtreeNodes(const TreeNode* node) const {
+    int count = 1; // this node
+    for (const auto* child : node->children) {
+        count += countSubtreeNodes(child);
+    }
+    return count;
+}
+
 bool SceneTreeModel::removeNodeRecursive(TreeNode* parent,
                                           const std::string& name) {
     for (auto it = parent->children.begin(); it != parent->children.end(); ++it) {
         if ((*it)->name == name) {
             if (selectedNode_ == *it) selectedNode_ = nullptr;
-            delete *it;
+            int subtreeCount = countSubtreeNodes(*it);
+            delete *it; // ~TreeNode recursively deletes all children
             parent->children.erase(it);
-            --nodeCount_;
+            nodeCount_ -= subtreeCount;
             return true;
         }
         if (removeNodeRecursive(*it, name)) return true;
@@ -107,6 +119,105 @@ TreeNode* SceneTreeModel::findNodeRecursive(TreeNode* node,
         if (found) return found;
     }
     return nullptr;
+}
+
+// ---- Rename / Duplicate / Move ----
+
+bool SceneTreeModel::renameNode(const std::string& oldName,
+                                 const std::string& newName) {
+    if (newName.empty()) return false;
+    if (oldName == "SceneRoot") return false;
+    if (oldName == newName) return true;
+    if (findNode(newName)) return false; // name collision
+    TreeNode* node = findNode(oldName);
+    if (!node) return false;
+    node->name = newName;
+    return true;
+}
+
+bool SceneTreeModel::duplicateNode(const std::string& name) {
+    TreeNode* source = findNode(name);
+    if (!source || !source->parent) return false;
+
+    // Generate unique name: "Name (Copy)", "Name (Copy 2)", ...
+    std::string copyName = source->name + " (Copy)";
+    int suffix = 1;
+    while (findNode(copyName)) {
+        ++suffix;
+        copyName = source->name + " (Copy " + std::to_string(suffix) + ")";
+    }
+
+    TreeNode* copy = new TreeNode(copyName);
+    deepCopyChildren(copy, source);
+
+    // Insert right after source in parent's child list
+    auto& siblings = source->parent->children;
+    auto it = std::find(siblings.begin(), siblings.end(), source);
+    siblings.insert(it + 1, copy);
+    copy->parent = source->parent;
+    ++nodeCount_;
+    return true;
+}
+
+void SceneTreeModel::deepCopyChildren(TreeNode* dest, TreeNode* src) {
+    for (auto* child : src->children) {
+        TreeNode* copy = new TreeNode(child->name);
+        dest->children.push_back(copy);
+        copy->parent = dest;
+        ++nodeCount_;
+        deepCopyChildren(copy, child);
+    }
+}
+
+bool SceneTreeModel::moveNode(const std::string& name,
+                               const std::string& targetName,
+                               InsertPosition pos) {
+    TreeNode* source = findNode(name);
+    TreeNode* target = findNode(targetName);
+    if (!source || !target) return false;
+    if (source == target) return false;               // self-drop
+    if (source->parent == nullptr) return false;      // cannot move root
+    if (isDescendantOf(target, source)) return false; // circular dependency
+
+    // Detach from current parent (no delete, no nodeCount change)
+    auto& oldSiblings = source->parent->children;
+    oldSiblings.erase(
+        std::remove(oldSiblings.begin(), oldSiblings.end(), source),
+        oldSiblings.end());
+
+    // Attach to new position
+    if (pos == InsertPosition::AsChild) {
+        target->children.push_back(source);
+        source->parent = target;
+    } else {
+        TreeNode* newParent = target->parent;
+        if (!newParent) {
+            // Target is root, fall back to child insertion
+            target->children.push_back(source);
+            source->parent = target;
+        } else {
+            auto& newSiblings = newParent->children;
+            auto it = std::find(newSiblings.begin(), newSiblings.end(), target);
+            if (pos == InsertPosition::AfterSibling) {
+                newSiblings.insert(it + 1, source);
+            } else {
+                newSiblings.insert(it, source);
+            }
+            source->parent = newParent;
+        }
+    }
+    return true;
+}
+
+bool SceneTreeModel::isDescendantOf(TreeNode* node,
+                                     TreeNode* potentialAncestor) const {
+    if (!node || !potentialAncestor) return false;
+    TreeNode* current = node->parent;
+    while (current) {
+        if (current == potentialAncestor) return true;
+        current = current->parent;
+    }
+    return false;
 }
 
 // ============================================================
@@ -168,6 +279,12 @@ bool SceneTreeView::initialize(
 void SceneTreeView::update(float) {
     if (!windowOpen_) return;
 
+    // Clear drag-drop tracking when no drag is active
+    if (ImGui::GetDragDropPayload() == nullptr) {
+        draggedNodeName_.clear();
+        dropTargetNodeName_.clear();
+    }
+
     ImGui::SetNextWindowSize(ImVec2(300, 400), ImGuiCond_FirstUseEver);
     if (!ImGui::Begin("Scene Tree", &windowOpen_)) {
         ImGui::End();
@@ -177,6 +294,9 @@ void SceneTreeView::update(float) {
     if (model_ && model_->getRoot()) {
         renderNode(model_->getRoot());
     }
+
+    // Popup modals (rendered inside the window for ID stack consistency)
+    renderPendingPopups();
 
     ImGui::End();
 
@@ -192,28 +312,198 @@ void SceneTreeView::terminate() {
 void SceneTreeView::renderNode(TreeNode* node) {
     if (!node) return;
 
+    // Inline rename mode: replace TreeNode with an InputText
+    if (renaming_ && renameTarget_ == node->name) {
+        renderRenameInput(node);
+        return;
+    }
+
+    // Dim node while it is being dragged
+    bool isDragged = (!draggedNodeName_.empty()
+                      && draggedNodeName_ == node->name);
+    if (isDragged) {
+        ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.4f);
+    }
+
+    // Build TreeNode flags
+    bool isTarget = (!dropTargetNodeName_.empty()
+                     && dropTargetNodeName_ == node->name);
     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow;
-    if (node->children.empty()) {
-        flags |= ImGuiTreeNodeFlags_Leaf;
-    }
-    if (node->selected) {
-        flags |= ImGuiTreeNodeFlags_Selected;
-    }
-    if (node->parent == nullptr) {
-        flags |= ImGuiTreeNodeFlags_DefaultOpen;
-    }
+    if (node->children.empty()) flags |= ImGuiTreeNodeFlags_Leaf;
+    if (node->selected) flags |= ImGuiTreeNodeFlags_Selected;
+    if (node->parent == nullptr) flags |= ImGuiTreeNodeFlags_DefaultOpen;
+    if (isTarget) flags |= ImGuiTreeNodeFlags_Framed;
 
     bool opened = ImGui::TreeNodeEx(node->name.c_str(), flags);
 
+    // Left-click => select
     if (ImGui::IsItemClicked() && controller_) {
         controller_->onNodeClicked(node->name);
     }
 
+    // Right-click context menu
+    renderContextMenu(node);
+
+    // Drag source (non-root nodes only)
+    if (node->parent != nullptr) {
+        if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
+            ImGui::SetDragDropPayload("SCENE_NODE", node->name.c_str(),
+                                       node->name.size() + 1);
+            ImGui::Text("Move: %s", node->name.c_str());
+            ImGui::EndDragDropSource();
+            draggedNodeName_ = node->name;
+        }
+    }
+
+    // Drop target
+    if (ImGui::BeginDragDropTarget()) {
+        const ImGuiPayload* payload =
+            ImGui::AcceptDragDropPayload("SCENE_NODE");
+        if (ImGui::IsItemHovered(
+                ImGuiHoveredFlags_AllowWhenBlockedByPopup) || payload) {
+            dropTargetNodeName_ = node->name;
+        }
+        if (payload) {
+            std::string draggedName(
+                static_cast<const char*>(payload->Data));
+            if (draggedName != node->name) {
+                InsertPosition pos = InsertPosition::AsChild;
+                if (ImGui::GetIO().KeyShift) {
+                    pos = InsertPosition::BeforeSibling;
+                } else if (ImGui::GetIO().KeyCtrl) {
+                    pos = InsertPosition::AfterSibling;
+                }
+                model_->moveNode(draggedName, node->name, pos);
+            }
+            draggedNodeName_.clear();
+            dropTargetNodeName_.clear();
+        }
+        ImGui::EndDragDropTarget();
+    }
+
+    // Restore alpha
+    if (isDragged) {
+        ImGui::PopStyleVar();
+    }
+
+    // Recurse into children
     if (opened) {
         for (auto* child : node->children) {
             renderNode(child);
         }
         ImGui::TreePop();
+    }
+}
+
+void SceneTreeView::renderContextMenu(TreeNode* node) {
+    if (!ImGui::BeginPopupContextItem()) return;
+
+    if (ImGui::MenuItem("Add Child Node")) {
+        pendingAddChildParent_ = node->name;
+        addChildBuffer_[0] = '\0';
+    }
+    if (ImGui::MenuItem("Rename")) {
+        startRename(node);
+    }
+    if (ImGui::MenuItem("Duplicate")) {
+        model_->duplicateNode(node->name);
+    }
+
+    ImGui::Separator();
+
+    if (node->name != "SceneRoot") {
+        if (ImGui::MenuItem("Delete")) {
+            pendingDeleteTarget_ = node->name;
+        }
+    }
+
+    ImGui::EndPopup();
+}
+
+void SceneTreeView::renderRenameInput(TreeNode* node) {
+    ImGui::SetNextItemWidth(200);
+    ImGuiInputTextFlags f = ImGuiInputTextFlags_EnterReturnsTrue
+                            | ImGuiInputTextFlags_AutoSelectAll;
+    if (ImGui::InputText("##rename", renameBuffer_,
+                          sizeof(renameBuffer_), f)) {
+        finishRename();
+    }
+    // Commit on focus loss (click away)
+    if (ImGui::IsItemDeactivatedAfterEdit()) {
+        finishRename();
+    }
+}
+
+void SceneTreeView::startRename(TreeNode* node) {
+    renaming_ = true;
+    renameTarget_ = node->name;
+    std::strncpy(renameBuffer_, node->name.c_str(), sizeof(renameBuffer_) - 1);
+    renameBuffer_[sizeof(renameBuffer_) - 1] = '\0';
+}
+
+void SceneTreeView::finishRename() {
+    if (!renaming_) return;
+    if (std::strlen(renameBuffer_) > 0 && renameTarget_ != renameBuffer_) {
+        model_->renameNode(renameTarget_, renameBuffer_);
+    }
+    renaming_ = false;
+    renameTarget_.clear();
+}
+
+void SceneTreeView::renderPendingPopups() {
+    if (!model_) return;
+
+    // --- Delete confirmation modal ---
+    if (!pendingDeleteTarget_.empty()) {
+        ImGui::OpenPopup("DeleteConfirm");
+    }
+    if (ImGui::BeginPopupModal("DeleteConfirm", nullptr,
+                                ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("Delete '%s' and all its children?",
+                    pendingDeleteTarget_.c_str());
+        if (ImGui::Button("Yes", ImVec2(80, 0))) {
+            model_->removeNode(pendingDeleteTarget_);
+            pendingDeleteTarget_.clear();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("No", ImVec2(80, 0))) {
+            pendingDeleteTarget_.clear();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
+    // --- Add Child popup ---
+    if (!pendingAddChildParent_.empty()) {
+        ImGui::OpenPopup("AddChildPopup");
+    }
+    if (ImGui::BeginPopupModal("AddChildPopup", nullptr,
+                                ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("New child of '%s':", pendingAddChildParent_.c_str());
+        ImGui::SetNextItemWidth(200);
+        bool enterPressed = ImGui::InputText(
+            "##addchildname", addChildBuffer_,
+            sizeof(addChildBuffer_),
+            ImGuiInputTextFlags_EnterReturnsTrue
+            | ImGuiInputTextFlags_AutoSelectAll);
+        bool ok = ImGui::Button("OK", ImVec2(80, 0));
+        ImGui::SameLine();
+        bool cancel = ImGui::Button("Cancel", ImVec2(80, 0));
+        if (ok || enterPressed) {
+            if (std::strlen(addChildBuffer_) > 0) {
+                TreeNode* parent =
+                    model_->findNode(pendingAddChildParent_);
+                model_->addNode(addChildBuffer_, parent);
+            }
+            pendingAddChildParent_.clear();
+            ImGui::CloseCurrentPopup();
+        }
+        if (cancel) {
+            pendingAddChildParent_.clear();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
     }
 }
 
@@ -301,9 +591,7 @@ bool SceneTreePlugin::initialize() {
         return false;
     }
 
-    // 2) 注册 View，传入 Model 和 Controller（Controller 在后面注册）
-    // 先注册 View，Controller 注册后 View 侧指针需要通过某种方式填充
-    // 修正：先注册 Model 和 Controller，再注册 View
+    // 2) 注册 Controller
     std::unordered_map<std::string, std::any> ctrlCfg;
     ctrlCfg["model"] = model;
     auto* controller = componentSystem.registerComponent<SceneTreeController>(
