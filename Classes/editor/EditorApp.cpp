@@ -1,6 +1,7 @@
 // EditorApp.cpp - 动画编辑器主场景（UGF 框架）
 #include "EditorApp.h"
 #include "EditorEvents.h"
+#include "plugins/scene_tree/SceneTreePlugin.h"
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
@@ -20,7 +21,6 @@ void EditorApp::onEnter() {
     if (!imguiBackendsReady_) return;
     ugf::UGF::getInstance().initialize();
     registerBuiltinPlugins();
-    schedule(schedule_selector(EditorApp::onEditorUpdate), 0.0f);
     CCLOG("[EditorApp] %zu plugins loaded", pluginSystem_.size());
 }
 
@@ -93,22 +93,31 @@ public:
 };
 
 void EditorApp::registerBuiltinPlugins() {
-    pluginSystem_.registerPlugin(std::make_unique<PlaceholderPlugin>("SceneTree"));
+    pluginSystem_.registerPlugin(std::make_unique<SceneTreePlugin>());
     pluginSystem_.registerPlugin(std::make_unique<PlaceholderPlugin>("PropertyEditor"));
     pluginSystem_.registerPlugin(std::make_unique<PlaceholderPlugin>("Timeline"));
     pluginSystem_.registerPlugin(std::make_unique<PlaceholderPlugin>("BehaviorTree"));
 }
 
 void EditorApp::onEditorUpdate(float) {
-    if (!imguiBackendsReady_) return;
-    ImGui_ImplOpenGL3_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
-    pluginSystem_.updateAll(0.016f);
-    ugf::EventBus::getInstance().update();
+    // ImGui frame work (NewFrame / Render) is now done in visit() to
+    // guarantee the correct ordering: NewFrame before Render.
 }
 
 void EditorApp::visit(Renderer* r, const Mat4& t, uint32_t f) {
     Scene::visit(r, t, f);
-    if (imguiBackendsReady_) { ImGui::Render(); ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData()); }
+    if (!imguiBackendsReady_) return;
+
+    // Start the ImGui frame (must happen before any ImGui widget calls)
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+
+    // Update all plugins (they render ImGui widgets here)
+    pluginSystem_.updateAll(0.016f);
+    ugf::EventBus::getInstance().update();
+
+    // Render and present
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }

@@ -70,12 +70,15 @@ list(APPEND GAME_SOURCE
      Classes/AppDelegate.cpp
      Classes/HelloWorldScene.cpp
      Classes/editor/EditorApp.cpp
+     Classes/plugins/scene_tree/SceneTreePlugin.cpp
+     Classes/plugins/scene_tree/test_scene_tree_api.cpp
      )
 list(APPEND GAME_HEADER
      Classes/AppDelegate.h
      Classes/HelloWorldScene.h
      Classes/editor/EditorApp.h
      Classes/editor/EditorEvents.h
+     Classes/plugins/scene_tree/SceneTreePlugin.h
      )
 
 # ImGui 后端（GLFW + OpenGL3）— 编译进主项目
