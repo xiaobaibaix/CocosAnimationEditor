@@ -102,15 +102,18 @@ void EditorApp::registerBuiltinPlugins() {
 }
 
 void EditorApp::onEditorUpdate(float) {
+    // All ImGui frame work moved into visit() because cocos2d-x calls visit()
+    // before update(). NewFrame must happen before Render within the same call stack.
+}
+
+void EditorApp::visit(Renderer* r, const Mat4& t, uint32_t f) {
+    Scene::visit(r, t, f);
     if (!imguiBackendsReady_) return;
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
     pluginSystem_.updateAll(0.016f);
     ugf::EventBus::getInstance().update();
-}
-
-void EditorApp::visit(Renderer* r, const Mat4& t, uint32_t f) {
-    Scene::visit(r, t, f);
-    if (imguiBackendsReady_) { ImGui::Render(); ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData()); }
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
