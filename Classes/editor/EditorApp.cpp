@@ -4,6 +4,7 @@
 #include "plugins/scene_tree/SceneTreePlugin.h"
 #include "plugins/property_editor/PropertyEditorPlugin.h"
 #include "plugins/timeline/TimelinePlugin.h"
+#include "plugins/behavior_tree/BehaviorTreePlugin.h"
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
@@ -93,7 +94,7 @@ void EditorApp::registerBuiltinPlugins() {
     pluginSystem_.registerPlugin(std::make_unique<SceneTreePlugin>());
     pluginSystem_.registerPlugin(std::make_unique<PropertyEditorPlugin>());
     pluginSystem_.registerPlugin(std::make_unique<TimelinePlugin>());
-    pluginSystem_.registerPlugin(std::make_unique<PlaceholderPlugin>("BehaviorTree"));
+    pluginSystem_.registerPlugin(std::make_unique<BehaviorTreePlugin>());
 }
 
 // ImGui NewFrame/Render in visit() — cocos2d-x calls visit() before update()
